@@ -105,160 +105,19 @@ def load_and_transform_vision_data(image_paths, device):
         image_ouputs.append(image)
     return torch.stack(image_ouputs, dim=0)
 
-llama_dir = "/llama-adapter/llama_model_weights" # /path/to/LLaMA/
+llama_dir = "/home/ubuntu" # /path/to/LLaMA/
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = llama.load("/output_dir/checkpoint-12_30-20.pth", llama_dir).to(device)
-model.eval()
+model = llama.load("/home/ubuntu/checkpoint-VisionUniteV1.pth", llama_dir)
+print(model)
 
 model.to(device)
+model.eval()
 
-ann = json.load(open('/Dataset/-MLLM-Fundus/All_json/RITE40_Test20.json'))
-fileHandler  =  open("/Valset_list_updated.txt",  "r")
-listOfLines  =  fileHandler.readlines()
-for  line in  listOfLines:
-    ann += json.load(open(line.strip()))
+images = ['/home/ubuntu/normal.jpg']
+prompt = ['Describe this image']
 
-Batchsize= 8
-predict = []
-GroundTruth = []
-image = []
-similarity = []
-cls_labels = []
-cls_preds = []
-instruction_gt = []
-Keyword_list = []
-data_dict = {}
-
-# bertsimilarity=bertsimilarity.BERTSimilarity()
-for index in range(0, len(ann), Batchsize):
-    sample = []
-    prompt = []
-    prompt_gt = []
-    label = []
-    for i in range(Batchsize):
-        try:
-            url = ann[index+i]['ImageID']
-            # data_dict[url] = data_dict.get(url, 0) + 1
-            sample.append(ann[index+i]['ImageID'])
-            prompt_gt.append(ann[index+i]['Instruction'])
-            prompt.append(llama.format_prompt(ann[index+i]['Instruction']))
-            label.append(ann[index+i]['Answer'])
-
-            sample.append(ann[index+i]['ImageID'])
-            prompt_gt.append(ann[index+i]['Instruction0'])
-            prompt.append(llama.format_prompt(ann[index+i]['Instruction0']))
-            label.append(ann[index+i]['Answer0'])
-
-            sample.append(ann[index+i]['ImageID'])
-            prompt_gt.append(ann[index+i]['Instruction1'])
-            prompt.append(llama.format_prompt(ann[index+i]['Instruction1']))
-            label.append(ann[index+i]['Answer1'])
-
-            if ann[index+i]['Keyword'][0] == 'A':
-                cls_labels.append([1.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                if 'FHE_label' in ann[index+i].keys():
-                    if float(ann[index+i]['FHE_label']) > 0:
-                        cls_labels[len(cls_labels)-1][1] = 1.0
-                        cls_labels[len(cls_labels)-1][0] = 0.0
-                if 'OCD_label' in ann[index+i].keys():
-                    if float(ann[index+i]['OCD_label']) > 0:
-                        cls_labels[len(cls_labels)-1][2] = 1.0
-                        cls_labels[len(cls_labels)-1][0] = 0.0
-                if 'FBC_label' in ann[index+i].keys():
-                    if float(ann[index+i]['FBC_label']) > 0:
-                        cls_labels[len(cls_labels)-1][3] = 1.0
-                        cls_labels[len(cls_labels)-1][0] = 0.0
-                if 'Macular_label' in ann[index+i].keys():
-                    if float(ann[index+i]['Macular_label']) > 0:
-                        cls_labels[len(cls_labels)-1][4] = 1.0
-                        cls_labels[len(cls_labels)-1][0] = 0.0
-                if 'AV_label' in ann[index+i].keys():
-                    if float(ann[index+i]['AV_label']) > 0:
-                        cls_labels[len(cls_labels)-1][5] = 1.0
-                        cls_labels[len(cls_labels)-1][0] = 0.0
-                cls_labels.append(cls_labels[len(cls_labels)-1])
-                cls_labels.append(cls_labels[len(cls_labels)-1])
-                Keyword_list.append(ann[index+i]['Keyword'])
-                Keyword_list.append(ann[index+i]['Keyword'])
-                Keyword_list.append(ann[index+i]['Keyword'])
-            else:
-                cls_labels.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                cls_labels.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                cls_labels.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                Keyword_list.append(ann[index+i]['Keyword'])
-                Keyword_list.append(ann[index+i]['Keyword'])
-                Keyword_list.append(ann[index+i]['Keyword'])
-            # if ann[index+i]['Keyword'][0] == 'A':
-            #     cls_labels.append(1.0)
-            #     if 'AVR_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['AVR_label']) > 0:
-            #             cls_labels[index+i] = 2.0
-            #     if 'CDR_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['CDR_label']) > 0:
-            #             cls_labels[index+i] = 3.0
-            #     if 'Glaucoma_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['Glaucoma_label']) > 0:
-            #             cls_labels[index+i] = 4.0
-            #     if 'Myopia_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['Myopia_label']) > 0:
-            #             cls_labels[index+i] = 5.0
-            #     if 'DR_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['DR_label']) > 0:
-            #             cls_labels[index+i] = 6.0
-            #     if 'Macular_label' in ann[index+i].keys():
-            #         if float(ann[index+i]['Macular_label']) > 0:
-            #             cls_labels[index+i] = 7.0
-            # else:
-            #     cls_labels.append(0.0)
-        except:
-            continue
-    # print(sample)
-    input = load_and_transform_vision_data(sample, device)
-    # prompt = prompt.to(device)
-    results, cls_pred = model.generate(input, prompt, input_type="vision")
-    for i in range(len(results)):
-        # print(results[i])
-        # print(len(label[i]))
-        # print(len(results[i]))
-        # similarity.append(bertsimilarity.calculate_distance(label[i],results[i]))
-        # similarity.append(0)
-        image.append(sample[i])
-        instruction_gt.append(prompt_gt[i])
-        GroundTruth.append(label[i])
-        index = results[i].rfind('.')
-        if (index+1)!=len(results[i]):
-            results[i] = results[i][:index+1]
-        predict.append(capitalize_sentences(results[i]).replace(' i ', ' I ').replace(' i\'', ' I\''))
-        # cls_labels.append(cls_labels[i])
-        # cls_preds.append([cls_pred[i][0].cpu().numpy(),cls_pred[i][1].cpu().numpy(),cls_pred[i][2].cpu().numpy(),cls_pred[i][3].cpu().numpy(),cls_pred[i][4].cpu().numpy(),cls_pred[i][5].cpu().numpy()])
-        cls_preds.append(cls_pred[i])
-
-    dict = {'ImageID': image, 'instruction_gt': instruction_gt, 'GT': GroundTruth , 'Predict': predict, 'Keyword': Keyword_list, 'cls_labels': cls_labels,'cls_preds': cls_preds}
-    df = pd.DataFrame(dict)
-    df.to_csv('./results/Test_result_12_30-20.csv',index=False)
-
-assert len(cls_labels) == len(cls_preds)
-
-cls_labels = np.array(cls_labels)
-cls_preds = np.array(cls_preds)
-
-class_1 = cls_labels[:,0]
-class_2 = cls_labels[:,1]
-class_3 = cls_labels[:,2]
-class_4 = cls_labels[:,3]
-class_5 = cls_labels[:,4]
-class_6 = cls_labels[:,5]
-class_1_pred = cls_preds[:,0]
-class_2_pred = cls_preds[:,1]
-class_3_pred = cls_preds[:,2]
-class_4_pred = cls_preds[:,3]
-class_5_pred = cls_preds[:,4]
-class_6_pred = cls_preds[:,5]
-
-metrics(class_1_pred, class_1)
-metrics(class_2_pred, class_2)
-metrics(class_3_pred, class_3)
-metrics(class_4_pred, class_4)
-metrics(class_5_pred, class_5)
-metrics(class_6_pred, class_6)
+input = load_and_transform_vision_data(images, device)
+# prompt = prompt.to(device)
+results, cls_pred = model.generate(input, prompt, input_type="vision")
+print(results)

@@ -241,16 +241,16 @@ class LLaMA_adapter(nn.Module):
         self.clip, _, _ = open_clip.create_model_and_transforms('ViT-L-14', pretrained='openai')
 
         # 2. tokenizer
-        self.tokenizer = Tokenizer(model_path=llama_tokenizer)
+        self.tokenizer = Tokenizer(model_path='/home/ubuntu/tokenizer.model')
 
         # 3. llama
-        with open(os.path.join(llama_ckpt_dir, "params.json"), "r") as f:
+        with open(os.path.join('/home/ubuntu/params.json'), "r") as f:
             params = json.loads(f.read())
         model_args: ModelArgs = ModelArgs(
             max_seq_len=512, max_batch_size=32, **params
         )
         model_args.vocab_size = self.tokenizer.n_words
-        torch.set_default_tensor_type(torch.cuda.HalfTensor)
+        # torch.set_default_tensor_type(torch.cuda.HalfTensor)
         self.llama = Transformer(model_args)
         torch.set_default_tensor_type(torch.FloatTensor)
 
@@ -408,7 +408,7 @@ class LLaMA_adapter(nn.Module):
         
         visual_feats = torch.cat((visual_feats, abnormal_feats), dim=1)
 
-        visual_feats = visual_feats.half()
+        visual_feats = visual_feats.bfloat16()
 
         cls_loss = self.criterion_ab(abnormal_feats1, cls_label[0])
         cls_loss += self.criterion_ab(abnormal_feats2, cls_label[1])
@@ -505,6 +505,7 @@ class LLaMA_adapter(nn.Module):
         bsz = len(imgs)
         params = self.llama.params
         assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
+        print(imgs, prompts)
         assert len(imgs) == len(prompts)
 
         with torch.cuda.amp.autocast():
@@ -542,7 +543,7 @@ class LLaMA_adapter(nn.Module):
 
             
             visual_query = torch.cat((visual_query, abnormal_feats), dim=1)
-            visual_query = visual_query.half()
+            visual_query = visual_query.bfloat16()
 
         Keyword_temp = []
         for i in range(len(cls_pred)):
@@ -627,15 +628,18 @@ def available_models():
     return list(_MODELS.keys())
 
 def load(name, llama_dir, device="cuda" if torch.cuda.is_available() else "cpu", download_root='ckpts', knn=False):
-    if name in _MODELS:
-        model_path = _download(_MODELS[name], download_root)
-    elif os.path.isfile(name):
-        model_path = name
-    else:
-        return RuntimeError(f"Model {name} not found; available models = {available_models()}")
+    # if name in _MODELS:
+    #     model_path = _download(_MODELS[name], download_root)
+    # elif os.path.isfile(name):
+    #     model_path = name
+    # else:
+    #     return RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
+    model_path = '/home/ubuntu/checkpoint-VisionUniteV1.pth'
+    
     llama_type = "7B"
-    llama_ckpt_dir = os.path.join(llama_dir, llama_type)
+    # llama_ckpt_dir = os.path.join(llama_dir, llama_type)
+    llama_ckpt_dir = os.path.join(llama_dir)
     llama_tokenzier_path = os.path.join(llama_ckpt_dir, 'tokenizer.model')
 
     # load llama_adapter weights and model_cfg
